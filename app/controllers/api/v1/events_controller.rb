@@ -4,10 +4,11 @@ module Api
       skip_before_action :authenticate_user!, only: [:index, :show]
 
       def index
-        events = Event.published.upcoming
+        events = Event.published.upcoming.includes(:user, :ticket_tiers)
 
         if params[:search].present?
-          events = events.where("title LIKE '%#{params[:search]}%' OR description LIKE '%#{params[:search]}%'")
+          search = "%#{params[:search]}%"
+          events = events.where("title LIKE ? OR description LIKE ?", search, search)
         end
 
         if params[:category].present?
@@ -17,9 +18,11 @@ module Api
         if params[:city].present?
           events = events.where(city: params[:city])
         end
-
-        events = events.order(params[:sort_by] || "starts_at ASC")
-
+        
+        allowed_sort = ["starts_at ASC", "starts_at DESC", "created_at ASC", "created_at DESC"]
+        sort = allowed_sort.includes?(params[:sort_by]) ? params[:sort_by] : "starts_at ASC"
+        events = events.order(sort)
+        
         render json: events.map { |event|
           {
             id: event.id,
